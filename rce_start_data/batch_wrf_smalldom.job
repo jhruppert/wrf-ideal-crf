@@ -1,0 +1,30 @@
+#!/bin/bash
+#PBS -N wrfideal-small
+#PBS -A UOKL0049
+#PBS -l walltime=12:00:00
+#PBS -q main
+#PBS -j oe
+#PBS -k eod
+### Select n nodes with a max of 128 CPUs per node for a total of n*128 MPI processes
+#PBS -l select=1:ncpus=100:mpiprocs=100:ompthreads=1
+
+export testname="smalldom"
+
+export SCRTCHDIR=/glade/derecho/scratch/$USER/wrf-ideal/${testname}
+mkdir -p $SCRTCHDIR
+
+/bin/cp ../test/em_convrad/namelist.input.${testname} ./namelist.input
+/bin/cp ../test/em_convrad/input_sounding.${testname} ./input_sounding
+/bin/cp ../../bashrc_wrf_der bashrc_wrf
+# /bin/cp ../../rce_start_data/var_extra_output .
+source bashrc_wrf
+
+export WRFRUNDIR=`pwd`
+cd $SCRTCHDIR
+cp -rafL $WRFRUNDIR/* .
+
+#### Run the executable
+./ideal.exe
+mpiexec ./wrf.exe
+
+cp rsl.out.0000 ${WRFRUNDIR}/rsl.out.${testname}

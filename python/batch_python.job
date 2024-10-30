@@ -1,0 +1,15 @@
+#!/bin/bash
+#PBS -N python
+#PBS -A UOKL0049
+#PBS -l walltime=12:00:00
+#PBS -q main
+#PBS -j oe
+#PBS -k eod
+### Select n nodes with a max of 128 CPUs per node for a total of n*128 MPI processes
+#PBS -l select=1:ncpus=128:mpiprocs=128:ompthreads=1
+
+source ~/.bashrc
+mamba activate plotting
+
+# Primary executable
+python write_qvar_vint.py

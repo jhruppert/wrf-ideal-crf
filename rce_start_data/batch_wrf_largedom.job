@@ -1,0 +1,36 @@
+#!/bin/bash
+#PBS -N wrfideal-large
+#PBS -A UOKL0049
+#PBS -l walltime=12:00:00
+#PBS -q main
+#PBS -j oe
+#PBS -k eod
+### Select n nodes with a max of 128 CPUs per node for a total of n*128 MPI processes
+#PBS -l select=3:ncpus=128:mpiprocs=128:ompthreads=1
+
+export testname="largedom2"
+
+export SCRTCHDIR=/glade/derecho/scratch/$USER/wrf-ideal/${testname}
+mkdir -p $SCRTCHDIR
+
+export forcing_dir="../../rce_start_data"
+
+/bin/rm -f namelist.input
+/bin/cp ../../bashrc_wrf_der bashrc_wrf
+/bin/cp $forcing_dir/namelist.input.${testname} ./namelist.input
+/bin/cp $forcing_dir/input_sounding.${testname} ./input_sounding
+/bin/cp $forcing_dir/var_extra_output .
+source bashrc_wrf
+
+export WRFRUNDIR=`pwd`
+cd $SCRTCHDIR
+cp -rafL $WRFRUNDIR/* .
+
+#### Run the executables
+# IDEAL for initial state
+./ideal.exe
+
+# Primary executable
+mpiexec ./wrf.exe
+
+# cp rsl.out.0000 ${WRFRUNDIR}/rsl.out.${testname}

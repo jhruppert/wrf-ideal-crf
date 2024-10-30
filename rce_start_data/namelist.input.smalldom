@@ -1,0 +1,123 @@
+ &time_control
+ start_year                          = 2007,
+ start_month                         = 06,
+ start_day                           = 01,
+ start_hour                          = 00,
+ start_minute                        = 00,
+ start_second                        = 00,
+ end_year                            = 2007,
+ end_month                           = 09,
+ end_day                             = 10,
+ end_hour                            = 00,
+ end_minute                          = 00,
+ end_second                          = 00,
+ history_interval                    = 60,
+ frames_per_outfile                  = 24,
+ restart                             = .false.,
+ restart_interval                    = 7200,
+ write_hist_at_0h_rst                = .true.,
+ io_form_history                     = 2
+ io_form_restart                     = 2
+ io_form_input                       = 2
+ io_form_boundary                    = 2
+! iofields_filename                   = "var_extra_output"
+! ignore_iofields_warning             = .true.
+ /
+
+ &domains
+! use_adaptive_time_step = .true.
+! nproc_x = 10,
+! nproc_y = 10,
+ time_step                           = 6,
+ max_dom                             = 1,
+ e_we                                = 100,
+ e_sn                                = 100,
+ e_vert                              = 80, 80, 80,
+ dx                                  = 1000,
+ dy                                  = 1000,
+ ztop                                = 30000.,
+ eta_levels = 1, 0.9940526, 0.9877748, 0.9811499, 0.9741606, 0.9667891, 0.9590168, 
+              0.9508248, 0.9421935, 0.9331028, 0.9235321, 0.9134603, 0.9028662, 
+              0.8917282, 0.8800244, 0.8677332, 0.8548327, 0.8413014, 0.8271182, 
+              0.8122628, 0.7967154, 0.7804576, 0.7634726, 0.7457449, 0.7272616, 
+              0.7080122, 0.6879893, 0.6671892, 0.6456169, 0.6232927, 0.6002442, 
+              0.5765074, 0.5521269, 0.527157, 0.5016617, 0.4757149, 0.4494012, 
+              0.4228153, 0.3960621, 0.3692558, 0.3425195, 0.3159837, 0.2897854, 
+              0.2646708, 0.2416453, 0.2205351, 0.2011808, 0.1834363, 0.1671679, 
+              0.1522526, 0.138578, 0.1260409, 0.1145466, 0.1040083, 0.09434664, 
+              0.08548865, 0.07736743, 0.06992175, 0.0630954, 0.05683686, 0.05109889, 
+              0.04583822, 0.04101512, 0.03659321, 0.0325391, 0.02882223, 0.02541453, 
+              0.02229027, 0.0194259, 0.01679977, 0.01439209, 0.01218468, 0.01016088, 
+              0.008305412, 0.0066043, 0.005044669, 0.00361478, 0.002303815, 
+              0.001101908, 0
+
+ &physics
+ icloud = 1,
+ mp_physics                          = 16,
+ ra_lw_physics                       = 4,
+ ra_sw_physics                       = 4,
+ radt                                = 1,
+ sf_sfclay_physics                   = 1,
+ sf_surface_physics                  = 1,
+ bl_pbl_physics                      = 1,
+ bldt                                = 0,
+ cu_physics                          = 0,
+ cudt                                = 0,
+ do_radar_ref = 1,
+ bucket_mm                           =10.,
+ bucket_J                            =1.e8,
+ grav_settling = 0,
+ /
+
+ &fdda
+ /
+
+ &dynamics
+ hybrid_opt                          = 2, 
+ w_damping = 0,
+ rk_ord                              = 3,
+ diff_opt                            = 1,      1,      1,
+ km_opt                              = 4,      4,      4,
+ damp_opt                            = 3,
+ dampcoef                            = .2,
+ zdamp                               = 10000.,
+ khdif                               = 0,
+ kvdif                               = 0,
+ smdiv                               = 0.1,
+ emdiv                               = 0.01,
+ epssm                               = 0.1,
+ time_step_sound                     = 6,
+ h_mom_adv_order                     = 5,
+ v_mom_adv_order                     = 3,
+ h_sca_adv_order                     = 5,
+ v_sca_adv_order                     = 3,
+ zadvect_implicit = 1,
+ mix_full_fields                     = .true.,
+ non_hydrostatic                     = .true.,
+ pert_coriolis                       = .true.,
+ /
+
+ &bdy_control
+ periodic_x                          = .true.,
+ symmetric_xs                        = .false.,
+ symmetric_xe                        = .false.,
+ open_xs                             = .false., 
+ open_xe                             = .false.,
+ periodic_y                          = .true.,
+ symmetric_ys                        = .false.,
+ symmetric_ye                        = .false.,
+ open_ys                             = .false.,
+ open_ye                             = .false.,
+ /
+
+ &grib2
+ /
+
+ &namelist_quilt
+ nio_tasks_per_group = 0,
+ nio_groups = 1,
+ /
+&ideal
+ ideal_case = 3
+ /
+
