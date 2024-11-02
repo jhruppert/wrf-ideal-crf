@@ -9,8 +9,9 @@
 # Full variable lists
 ##########################################
 
-def proc_var_list():
-    out_var_names_3d = [
+# 3D variables
+def var_list_3d():
+    return [
         'qv',
         'qrain',
         'qcloud',
@@ -33,7 +34,10 @@ def proc_var_list():
         'theta_e',
         'rho',
         ]
-    out_var_names_2d = [
+
+# 2D variables
+def var_list_2d():
+    return [
         'pclass_area',
         'rain',
         'hfx',
@@ -59,7 +63,6 @@ def proc_var_list():
         'lwacre',
         'swacre',
         ]
-    return out_var_names_3d, out_var_names_2d
 
 ##########################################
 # Get metadata for a single variable

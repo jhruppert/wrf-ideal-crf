@@ -8,6 +8,7 @@
 import numpy as np
 from wrf import getvar, disable_xarray, ALL_TIMES
 from read_wrf_ideal import *
+from post_proc_metadata import *
 import os
 
 # disable_xarray()
@@ -30,6 +31,9 @@ lat, lon, nx1, nx2, nz = wrf_dims(wrffiles[0])
 dp = 25 # hPa
 pres = np.arange(1000, 25, -dp)
 nznew = len(pres)
+
+# Get variable list
+vars2d = var_list_2d()
 
 # Need to loop over time steps (uggghh)
 # dims2d=(nt_read,nx1,nx2)
