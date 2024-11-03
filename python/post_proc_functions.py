@@ -11,6 +11,27 @@ from precip_class import *
 from thermo_functions import *
 
 ##########################################
+# Write out variable to a NetCDF file
+##########################################
+
+def write_ncfile(file_out, var, var_name, description, units, dims_set, pres=None, do_pres=False): #, dim_names
+    ncfile = Dataset(file_out,mode='w', clobber=True)
+    # Add dimensions to file
+    for idim in range(len(dims_set)):
+        dim = ncfile.createDimension(dims_set[0][idim], dims_set[1][idim]) # unlimited axis (can be appended to).
+    if do_pres:
+        pres_nc = ncfile.createVariable('Pressure', np.single, len(pres))
+        pres_nc.units = 'hPa'
+        pres_nc[...] = pres
+    # Write variables
+    writevar = ncfile.createVariable(var_name, np.single, dims_set[0])
+    writevar.units = units
+    writevar.description = description
+    writevar[...] = var
+    ncfile.close()
+    return None
+
+##########################################
 # Calculate cloud classification
 ##########################################
 
@@ -65,11 +86,11 @@ def var_list_3d():
     return [
         # Variables that can be directly interpolated
         'qvapor',
-        'qrain',
-        'qcloud',
-        'qice',
-        'qsnow',
-        'qgraupel',
+        # 'qrain',
+        # 'qcloud',
+        # 'qice',
+        # 'qsnow',
+        # 'qgraupel',
         # 'u',
         # 'v',
         'w',
@@ -120,7 +141,7 @@ def var_list_2d():
         ]
 
 ##########################################
-# Get metadata for a single variable
+# Get variable metadata
 ##########################################
 
 def get_metadata(var_name, nt, nz, nx1, nx2):

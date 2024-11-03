@@ -27,7 +27,8 @@ def wrf_dims(wrffile):
     nx1 = lat1d.size
     nx2 = lon1d.size
     nz = wrffile_read.dimensions['bottom_top'].size
-    return lat1d, lon1d, nx1, nx2, nz
+    npd = wrffile_read.dimensions['Time'].size
+    return lat1d, lon1d, nx1, nx2, nz, npd
 
 # Read WRF variable
 def wrf_var_read(infile, varname):
