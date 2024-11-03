@@ -8,23 +8,29 @@
 ### Select n nodes with a max of 128 CPUs per node for a total of n*128 MPI processes
 #PBS -l select=1:ncpus=100:mpiprocs=100:ompthreads=1
 
-export testname="smalldom"
+export testname="smalldom1"
 
 export SCRTCHDIR=/glade/derecho/scratch/$USER/wrf-ideal/${testname}
 mkdir -p $SCRTCHDIR
 
-/bin/cp ../test/em_convrad/namelist.input.${testname} ./namelist.input
-/bin/cp ../test/em_convrad/input_sounding.${testname} ./input_sounding
+export forcing_dir="../../rce_start_data"
+
+/bin/rm -f namelist.input
 /bin/cp ../../bashrc_wrf_der bashrc_wrf
-# /bin/cp ../../rce_start_data/var_extra_output .
+/bin/cp $forcing_dir/namelist.input.${testname} ./namelist.input
+/bin/cp $forcing_dir/input_sounding.${testname} ./input_sounding
+/bin/cp $forcing_dir/var_extra_output .
 source bashrc_wrf
 
 export WRFRUNDIR=`pwd`
 cd $SCRTCHDIR
 cp -rafL $WRFRUNDIR/* .
 
-#### Run the executable
+#### Run the executables
+# IDEAL for initial state
 ./ideal.exe
+
+# Primary executable
 mpiexec ./wrf.exe
 
-cp rsl.out.0000 ${WRFRUNDIR}/rsl.out.${testname}
+# cp rsl.out.0000 ${WRFRUNDIR}/rsl.out.${testname}

@@ -5,6 +5,57 @@
 # jruppert@ou.edu
 # 1 Nov 2024
 
+from read_wrf_ideal import *
+import numpy as np
+from precip_class import *
+from thermo_functions import *
+
+##########################################
+# Calculate cloud classification
+##########################################
+
+def wrf_pclass(infile, dp):
+    # Read in and vertically integrate mixing ratios
+    q_list = ['QCLOUD', 'QRAIN','QICE', 'QSNOW', 'QGRAUP']
+    q_var = []
+    for ivar in range(len(q_list)):
+        ivar = wrf_var_read(infile,q_list[ivar]) # kg/kg
+        q_var.append(ivar)
+    q_var = np.stack(q_var, axis=0)
+    g = 9.81 # m/s^2
+    q_int = np.sum(q_var*dp, axis=1)/(-g)
+    return precip_class(q_int)
+
+##########################################
+# Calculate precipitable water (PW)
+##########################################
+
+def wrf_pw(infile, dp):
+    # Read in hydrostatic pressure to get dp for integral
+    p_hyd = wrf_var_read(infile,'P_HYD') # Pa
+    # p_hyd = np.ma.masked_where((p_hyd < 100e2), p_hyd, copy=False) # Mask out levels above 100 hPa
+    dp = np.gradient(p_hyd, axis=0, edge_order=1) # [Pa] Uses second order centered differencing
+    # Read in and vertically integrate mixing ratios
+    qv = wrf_var_read(infile, 'QVAPOR') # kg/kg
+    g = 9.81 # m/s^2
+    return np.sum(qv*dp, axis=1)/(-g)
+
+##########################################
+# Calculate saturation PW
+##########################################
+
+def wrf_pw_sat(infile, p_hyd, dp):
+    T0 = 300 # K
+    rd=287.04 # J/K/kg
+    cp=1004. # J/K/kg
+    rocp = rd/cp
+    theta = wrf_var_read(infile,'T') + T0 # K
+    tmpk = theta*(1e5/p_hyd)**(-rocp) # K
+    # Read in and vertically integrate mixing ratios
+    qv_sat = rv_saturation(tmpk, p_hyd) # kg/kg
+    g = 9.81 # m/s^2
+    return np.sum(qv_sat*dp, axis=1)/(-g)
+
 ##########################################
 # Full variable lists
 ##########################################
@@ -12,7 +63,8 @@
 # 3D variables
 def var_list_3d():
     return [
-        'qv',
+        # Variables that can be directly interpolated
+        'qvapor',
         'qrain',
         'qcloud',
         'qice',
@@ -22,28 +74,26 @@ def var_list_3d():
         # 'v',
         'w',
         'condh',
-        'mse',
-        'tmpk',
-        'hght',
         'rthratlw',
         'rthratsw',
         'rthratlwc',
-        'rthratlwcrf',
         'rthratswc',
-        'rthratswcrf',
-        'theta_e',
-        'rho',
+        # Variables that require special care
+        # 't',
+        # 'hght',
+        # 'rthratlwcrf',
+        # 'rthratswcrf',
+        # 'theta_e',
+        # 'mse',
+        # 'rho',
         ]
 
 # 2D variables
 def var_list_2d():
     return [
-        'pclass_area',
-        'rain',
+        # Variables that can be processed via CDO
         'hfx',
         'lh',
-        'pw',
-        'pw_sat',
         'lwupt',
         'swupt',
         'lwuptc',
@@ -60,8 +110,13 @@ def var_list_2d():
         'swdnb',
         'lwdnbc',
         'swdnbc',
-        'lwacre',
-        'swacre',
+        # Variables that require special care
+        # 'lwacre',
+        # 'swacre',
+        # 'pclass',
+        # 'rain',
+        # 'pw',
+        # 'pw_sat',
         ]
 
 ##########################################
@@ -70,18 +125,10 @@ def var_list_2d():
 
 def get_metadata(var_name, nt, nz, nx1, nx2):
 
-    # 2D variables
-    if var_name == 'pclass':
-        description = 'cloud classification (0 = nocloud,1=deepc,2=congest,3=shall,4=strat,5=anvil)'
-        units = '-'
-        dims = ('nt',6,'nx1','nx2')
-        dim_set = [(dims[0],'pclass',dims[1],dims[2]), (nt,6,nx1,nx2)]
-    elif var_name == 'rain':
-        description = 'rain rate (centered diff)'
-        units = 'mm/day'
-        dims = ('nt','nx1','nx2')
-        dim_set = [dims, (nt,nx1,nx2)]
-    elif var_name == 'hfx':
+    #######################################################
+    # Basic 2D variables
+    #######################################################
+    if var_name == 'hfx':
         description = 'surface sensible heat flux'
         units = 'W/m^2'
         dims = ('nt','nx1','nx2')
@@ -89,16 +136,6 @@ def get_metadata(var_name, nt, nz, nx1, nx2):
     elif var_name == 'lh':
         description = 'surface latent heat flux'
         units = 'W/m^2'
-        dims = ('nt','nx1','nx2')
-        dim_set = [dims, (nt,nx1,nx2)]
-    elif var_name == 'pw':
-        description = 'column integrated water vapor'
-        units = 'mm'
-        dims = ('nt','nx1','nx2')
-        dim_set = [dims, (nt,nx1,nx2)]
-    elif var_name == 'pw_sat':
-        description = 'column integrated saturation water vapor'
-        units = 'mm'
         dims = ('nt','nx1','nx2')
         dim_set = [dims, (nt,nx1,nx2)]
     elif var_name == 'lwupt':
@@ -181,6 +218,9 @@ def get_metadata(var_name, nt, nz, nx1, nx2):
         units = 'W/m^2'
         dims = ('nt','nx1','nx2')
         dim_set = [dims, (nt,nx1,nx2)]
+    #######################################################
+    # Special 2D variables
+    #######################################################
     elif var_name == 'lwacre':
         description = 'longwave column ACRE'
         units = 'W/m^2'
@@ -191,9 +231,30 @@ def get_metadata(var_name, nt, nz, nx1, nx2):
         units = 'W/m^2'
         dims = ('nt','nx1','nx2')
         dim_set = [dims, (nt,nx1,nx2)]
-
-    # 3D variables
-    elif var_name == 'qv':
+    elif var_name == 'pclass':
+        description = 'cloud classification (0 = nocloud,1=deepc,2=congest,3=shall,4=strat,5=anvil)'
+        units = '-'
+        dims = ('nt',6,'nx1','nx2')
+        dim_set = [(dims[0],'pclass',dims[1],dims[2]), (nt,6,nx1,nx2)]
+    elif var_name == 'rain':
+        description = 'rain rate (centered diff)'
+        units = 'mm/day'
+        dims = ('nt','nx1','nx2')
+        dim_set = [dims, (nt,nx1,nx2)]
+    elif var_name == 'pw':
+        description = 'column integrated water vapor'
+        units = 'mm'
+        dims = ('nt','nx1','nx2')
+        dim_set = [dims, (nt,nx1,nx2)]
+    elif var_name == 'pw_sat':
+        description = 'column integrated saturation water vapor'
+        units = 'mm'
+        dims = ('nt','nx1','nx2')
+        dim_set = [dims, (nt,nx1,nx2)]
+    #######################################################
+    # Basic 3D variables
+    #######################################################
+    elif var_name == 'qvapor':
         description = 'water vapor mixing ratio'
         units = 'kg/kg'
         dims = ('nt','nz','nx1','nx2')
@@ -243,21 +304,6 @@ def get_metadata(var_name, nt, nz, nx1, nx2):
         units = 'K/s'
         dims = ('nt','nz','nx1','nx2')
         dim_set = [dims, (nt,nz,nx1,nx2)]
-    elif var_name == 'mse':
-        description = 'moist static energy'
-        units = 'J/kg'
-        dims = ('nt','nz','nx1','nx2')
-        dim_set = [dims, (nt,nz,nx1,nx2)]
-    elif var_name == 'tmpk':
-        description = 'temperature'
-        units = 'K'
-        dims = ('nt','nz','nx1','nx2')
-        dim_set = [dims, (nt,nz,nx1,nx2)]
-    elif var_name == 'hght':
-        description = 'height'
-        units = 'm'
-        dims = ('nt','nz','nx1','nx2')
-        dim_set = [dims, (nt,nz,nx1,nx2)]
     elif var_name == 'rthratlw':
         description = 'longwave heating rate'
         units = 'K/s'
@@ -273,13 +319,26 @@ def get_metadata(var_name, nt, nz, nx1, nx2):
         units = 'K/s'
         dims = ('nt','nz','nx1','nx2')
         dim_set = [dims, (nt,nz,nx1,nx2)]
-    elif var_name == 'rthratlwcrf':
-        description = 'longwave cloud-radiation forcing'
+    elif var_name == 'rthratswc':
+        description = 'shortwave heating rate, clear sky'
         units = 'K/s'
         dims = ('nt','nz','nx1','nx2')
         dim_set = [dims, (nt,nz,nx1,nx2)]
-    elif var_name == 'rthratswc':
-        description = 'shortwave heating rate, clear sky'
+    #######################################################
+    # Special 3D variables
+    #######################################################
+    elif var_name == 't':
+        description = 'temperature'
+        units = 'K'
+        dims = ('nt','nz','nx1','nx2')
+        dim_set = [dims, (nt,nz,nx1,nx2)]
+    elif var_name == 'hght':
+        description = 'height'
+        units = 'm'
+        dims = ('nt','nz','nx1','nx2')
+        dim_set = [dims, (nt,nz,nx1,nx2)]
+    elif var_name == 'rthratlwcrf':
+        description = 'longwave cloud-radiation forcing'
         units = 'K/s'
         dims = ('nt','nz','nx1','nx2')
         dim_set = [dims, (nt,nz,nx1,nx2)]
@@ -291,6 +350,11 @@ def get_metadata(var_name, nt, nz, nx1, nx2):
     elif var_name == 'theta_e':
         description = 'equivalent potential temperature'
         units = 'K'
+        dims = ('nt','nz','nx1','nx2')
+        dim_set = [dims, (nt,nz,nx1,nx2)]
+    elif var_name == 'mse':
+        description = 'moist static energy'
+        units = 'J/kg'
         dims = ('nt','nz','nx1','nx2')
         dim_set = [dims, (nt,nz,nx1,nx2)]
     elif var_name == 'rho':

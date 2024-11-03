@@ -3,7 +3,7 @@
 # James Ruppert
 # 15 Oct 2024
 
-import netCDF4 as nc
+from netCDF4 import Dataset
 import numpy as np
 import subprocess
 
@@ -17,8 +17,9 @@ def get_wrf_file_list(filedir, tag):
     # times = get_times_wrffiles(files)
     return files#, times
 
+# Read WRF dimensions
 def wrf_dims(wrffile):
-    wrffile_read = nc.Dataset(wrffile)
+    wrffile_read = Dataset(wrffile)
     lat = wrffile_read.variables['XLAT'][:][0] # deg
     lon = wrffile_read.variables['XLONG'][:][0] # deg
     lat1d = lat[:,0]
@@ -27,6 +28,13 @@ def wrf_dims(wrffile):
     nx2 = lon1d.size
     nz = wrffile_read.dimensions['bottom_top'].size
     return lat1d, lon1d, nx1, nx2, nz
+
+# Read WRF variable
+def wrf_var_read(infile, varname):
+    ncfile = Dataset(infile)
+    var = ncfile.variables[varname][...]
+    ncfile.close()
+    return np.squeeze(var)
 
 # def get_times_wrffiles(files):
 #     # def slicer_vectorized(a,start,end):

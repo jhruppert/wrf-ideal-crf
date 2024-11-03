@@ -8,7 +8,7 @@
 import numpy as np
 from wrf import getvar, disable_xarray, ALL_TIMES
 from read_wrf_ideal import *
-from post_proc_metadata import *
+from python.post_proc_functions import *
 import os
 
 # disable_xarray()
