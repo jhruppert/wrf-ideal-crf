@@ -102,19 +102,18 @@ def density_moist(T, qv, pres):
 #   T    - temp [C or K]
 #   pres - pressure [Pa]
 def density_dry(T, pres):
-    
+
     p_fact=1
     if np.max(pres) < 1e4:
         p_fact=1e2 # Convert to Pa
-    
+
     if np.min(T) < 105.: # degC or K?
         T0=273.16
     else:
         T0=0.
-    T+=T0
-    
+
     rd=287.04
-    return pres*p_fact / ( rd * T )
+    return pres*p_fact / ( rd * (T+T0) )
 
 
 ############################################################################

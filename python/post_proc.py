@@ -1,85 +1,269 @@
 # Script to post-process high-resolution WRF model output.
-
+# 
 # Major tasks include computing the following for selected variables:
 #   1. domain-averages to produce time series
 #   2. vertical integrals
 #   3. pressure-level vertical interpolation
+# 
+# This script leverages the CDO (https://code.mpimet.mpg.de/projects/cdo/) module via
+# subprocess (executes as a terminal command) to generate basic time series, which helps
+# for checking for RCE. This should be available either by loading as a module or
+# installing into the conda/mamba kernel you're running.
+# 
+# James Ruppert
+# jruppert@ou.edu
+# 11/2/2024
 
+from netCDF4 import Dataset
 import numpy as np
-from wrf import getvar, disable_xarray, ALL_TIMES
+from wrf import getvar, vinterp, ALL_TIMES#, disable_xarray
 from read_wrf_ideal import *
-from python.post_proc_functions import *
+from post_proc_functions import *
 import os
+from mpi4py import MPI
 
 # disable_xarray()
+comm = MPI.COMM_WORLD
+nproc = comm.Get_size()
+
+# Options
 
 test_process = "ctl"
 
-#### Directories and model output specs
+# Basic 2D variables
+do_2d_vars = True
+# 2D ACRE variables
+do_acre = True
+# Special 2D variables
+do_2d_special = False
+# Basic 3D variables
+do_3d_vars = False
+# Special 3D variables
+do_3d_special = False
 
-datdir = "/glade/derecho/scratch/ruppert/wrf-ideal/smalldom/"
-wrfdir = "/glade/campaign/univ/uokl0049/ideal/largedom2/"+test_process+"/"
+########################################################
+#### Directories and model output specs
+########################################################
+
+test_process = "ctl"
+
+# wrfdir = "/glade/campaign/univ/uokl0049/ideal/largedom2/"+test_process+"/"
+wrfdir = "/ourdisk/hpc/radclouds/auto_archive_notyet/tape_2copies/wrf-ideal/largedom2/"+test_process+"/"
 outdir = wrfdir+"post_proc/"
 os.makedirs(outdir, exist_ok=True)
 
 # # Get WRF file list, dimensions
 wrftag = "wrfout_d01"
 wrffiles = get_wrf_file_list(wrfdir, wrftag)
-lat, lon, nx1, nx2, nz = wrf_dims(wrffiles[0])
+lat, lon, nx1, nx2, nz, npd = wrf_dims(wrffiles[0])
+nfiles = len(wrffiles)
 
 # New vertical dimension for pressure levels
 dp = 25 # hPa
 pres = np.arange(1000, 25, -dp)
 nznew = len(pres)
 
-# Get variable list
+# Get variable lists
 vars2d = var_list_2d()
+vars3d = var_list_3d()
 
-# Need to loop over time steps (uggghh)
-# dims2d=(nt_read,nx1,nx2)
-# dims3d=(nt_read,nz,nx1,nx2)
+# CDO command
+def runshell(str_command):
+    # process = subprocess.Popen(str_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    process = subprocess.Popen(str_command, shell=True, universal_newlines=True)
+    # lines = process.stdout.readlines()
+    # for iline in lines:
+    #     print(iline)
+    process.wait()
+    return None
 
-# psfc_sav = np.zeros(dims2d)
-# # T-sfc is prescribed SST
-# qv2m_sav = np.zeros(dims2d) # 2-m mixing ratio (model will use saturation surface value for fluxes)
+# Use CDO mergetime to generate files of basic 2D variables
 
-# z_sav = np.zeros(dims3d)
-# th_sav = np.zeros(dims3d)
-# qv_sav = np.zeros(dims3d)
-# # u_sav = np.zeros(dims)
-# # v_sav = np.zeros(dims)
+if do_2d_vars:
 
-# for it in range(nt_read):
-#     psfc_sav[it,...] = getvar(wrffile_read, 'slp', units="hPa", timeidx=nt_file-nt_read+it) # hPa
-#     qv2m_sav[it,...] = getvar(wrffile_read, 'Q2', timeidx=nt_file-nt_read+it)*1e3 # kg/kg --> g/kg
-#     z_sav[it,...] = getvar(wrffile_read, 'z', units="m", timeidx=nt_file-nt_read+it) # m
-#     th_sav[it,...] = getvar(wrffile_read, 'th', units="K", timeidx=nt_file-nt_read+it) # K
-#     qv_sav[it,...] = getvar(wrffile_read, 'QVAPOR', timeidx=nt_file-nt_read+it)*1e3 # kg/kg --> g/kg
-#     # u_sav[it,...] = getvar(wrffile_read, 'ua', timeidx=nt_file-nt_read+it)
-#     # v_sav[it,...] = getvar(wrffile_read, 'va', timeidx=nt_file-nt_read+it)
+    # for ivar in vars2d:
+    ivar = comm.rank
 
-# psfc_sav = np.ma.mean(psfc_sav)
-# qv2m_sav = np.ma.mean(qv2m_sav)
-# z_sav = np.ma.mean(z_sav, axis=(0,2,3))
-# th_sav = np.ma.mean(th_sav, axis=(0,2,3))
-# qv_sav = np.ma.mean(qv_sav, axis=(0,2,3))
+    varname_str = vars2d[ivar].upper()
 
-# # Variables for complete time series
-# # olr = getvar(wrffile_read, 'OLR', timeidx=ALL_TIMES) # W/m2
-# # pw = getvar(wrffile_read, 'pw', timeidx=ALL_TIMES) # mm
-# # precip = getvar(wrffile_read, 'RAINNC', timeidx=ALL_TIMES) # mm
+    # First, delete file if exists
+    operation_str = 'rm -rf '+outdir+varname_str+'.nc'
+    runshell(operation_str)
 
-# # Rain rate as centered difference
-# # for it in range(1,nt_file-1):
-# #     precip[it,...] = (precip[it+1,...] - precip[it-1,...]) * 0.5 # mm / time step
-# # precip[nt_file-1,...] = np.nan
-# # precip *= npd/24 # mm/dt --> mm/hr
+    operation_str1 = 'cdo mergetime'
+    operation_str2 = ' -selname,'+varname_str+' '
+    out_file = ' '+outdir+varname_str+'.nc'
+    str_out = ' > '+outdir+varname_str+'.log 2>&1'
 
-# # psfc_sav = np.ma.mean(psfc_sav, axis=(1,2))
-# # qv2m_sav = np.ma.mean(qv2m_sav, axis=(1,2))
+    # Create string array of file-specific commands
+    cdo_line = [operation_str1]
+    # for ifile in wrffiles:
+    for ifile in wrffiles:
+        cdo_line.append(operation_str2+ifile)
+    # Then join them into one string
+    cdo_line_merged = " ".join(cdo_line)
 
-# # olr = np.ma.mean(olr, axis=(1,2))
-# # pw = np.ma.mean(pw, axis=(1,2))
-# # precip = np.ma.mean(precip, axis=(1,2))
+    # Run CDO command
+    runshell(cdo_line_merged+out_file+str_out)
+    comm.barrier()
 
-# wrffile_read.close()
+########################################################
+# Use CDO subtraction to generate ACRE
+########################################################
+
+if do_acre:
+
+    # Remove first if exists
+    operation_str = 'rm -rf '+outdir+'LWacre.nc '+outdir+'SWacre.nc'
+    runshell(operation_str)
+
+    if comm.rank == 0:
+        operation_str = 'cdo sub '+outdir+'LWUPT.nc '+outdir+'LWDNT.nc '+outdir+'lw_t.nc'
+    if comm.rank == 1:
+        operation_str = 'cdo sub '+outdir+'LWUPB.nc '+outdir+'LWDNB.nc '+outdir+'lw_b.nc'
+    if comm.rank == 2:
+        operation_str = 'cdo sub '+outdir+'LWUPTC.nc '+outdir+'LWDNTC.nc '+outdir+'lw_tC.nc'
+    if comm.rank == 3:
+        operation_str = 'cdo sub '+outdir+'LWUPBC.nc '+outdir+'LWDNBC.nc '+outdir+'lw_bC.nc'
+    if comm.rank == 4:
+        operation_str = 'cdo sub '+outdir+'SWUPT.nc '+outdir+'SWDNT.nc '+outdir+'sw_t.nc'
+    if comm.rank == 5:
+        operation_str = 'cdo sub '+outdir+'SWUPB.nc '+outdir+'SWDNB.nc '+outdir+'sw_b.nc'
+    if comm.rank == 6:
+        operation_str = 'cdo sub '+outdir+'SWUPTC.nc '+outdir+'SWDNTC.nc '+outdir+'sw_tC.nc'
+    if comm.rank == 7:
+        operation_str = 'cdo sub '+outdir+'SWUPBC.nc '+outdir+'SWDNBC.nc '+outdir+'sw_bC.nc'
+
+    if comm.rank < 8:
+        runshell(operation_str)
+    comm.barrier()
+
+    if comm.rank == 0:
+        operation_str = 'cdo sub '+outdir+'lw_b.nc '+outdir+'lw_t.nc '+outdir+'lw_net.nc'
+    if comm.rank == 1:
+        operation_str = 'cdo sub '+outdir+'lw_bC.nc '+outdir+'lw_tC.nc '+outdir+'lw_netC.nc'
+    if comm.rank == 2:
+        operation_str = 'cdo sub '+outdir+'sw_b.nc '+outdir+'sw_t.nc '+outdir+'sw_net.nc'
+    if comm.rank == 3:
+        operation_str = 'cdo sub '+outdir+'sw_bC.nc '+outdir+'sw_tC.nc '+outdir+'sw_netC.nc'
+
+    if comm.rank < 4:
+        runshell(operation_str)
+    comm.barrier()
+
+    # Calculate the longwave ACRE
+    if comm.rank == 0:
+        operation_str = 'cdo sub '+outdir+'lw_net.nc '+outdir+'lw_netC.nc '+outdir+'LWacre.nc'
+    # Calculate the shortwave ACRE
+    if comm.rank == 1:
+        operation_str = 'cdo sub '+outdir+'sw_net.nc '+outdir+'sw_netC.nc '+outdir+'SWacre.nc'
+
+    if comm.rank < 2:
+        runshell(operation_str)
+    comm.barrier()
+
+    # Delete unneeded files
+    if comm.rank == 0:
+        operation_str = 'rm -rf '+outdir+'LWUPT.nc '+outdir+'LWDNT.nc '+outdir+'LWUPB.nc '+outdir+'LWDNB.nc'
+        runshell(operation_str)
+        operation_str = 'rm -rf '+outdir+'LWUPTC.nc '+outdir+'LWDNTC.nc '+outdir+'LWUPBC.nc '+outdir+'LWDNBC.nc'
+        runshell(operation_str)
+        operation_str = 'rm -rf '+outdir+'SWUPT.nc '+outdir+'SWDNT.nc '+outdir+'SWUPB.nc '+outdir+'SWDNB.nc'
+        runshell(operation_str)
+        operation_str = 'rm -rf '+outdir+'SWUPTC.nc '+outdir+'SWDNTC.nc '+outdir+'SWUPBC.nc '+outdir+'SWDNBC.nc'
+        runshell(operation_str)
+        operation_str = 'rm -rf '+outdir+'lw_t.nc '+outdir+'lw_b.nc '+outdir+'lw_tC.nc '+outdir+'lw_bC.nc'
+        runshell(operation_str)
+        operation_str = 'rm -rf '+outdir+'sw_t.nc '+outdir+'sw_b.nc '+outdir+'sw_tC.nc '+outdir+'sw_bC.nc'
+        runshell(operation_str)
+        operation_str = 'rm -rf '+outdir+'lw_net.nc '+outdir+'lw_netC.nc '+outdir+'sw_net.nc '+outdir+'sw_netC.nc'
+        runshell(operation_str)
+
+########################################################
+########################################################
+
+if do_2d_special:
+
+    # Read in variable from WRF files
+    # for ifile in range(nfiles):
+
+    # grav = 9.81 # m/s^2
+    # hght_bs = wrf_var_read0(wrffiles[0],'PHB')/grav # m
+    # print(hght_bs.shape)
+
+    for ifile in range(3):
+
+        # Read in hydrostatic pressure to get dp for integral
+        # p_hyd = wrf_var_read(wrffiles[ifile],'P_HYD') # Pa
+        # p_hyd = np.ma.masked_where((p_hyd < 100e2), p_hyd, copy=False) # Mask out levels above 100 hPa
+        # dp = np.gradient(p_hyd, axis=0, edge_order=1) # [Pa] Uses second order centered differencing
+
+        # Use staggered height instead
+        # hght_pert = wrf_var_read(wrffiles[ifile],'PH')/grav # m
+        
+        dset = Dataset(wrffiles[0])
+        hght = getvar(dset, "zstag", units='m', timeidx=ALL_TIMES)#, cache=cache)
+        # Also need density
+        # tv = getvar(dset, "tv", units='K', timeidx=ALL_TIMES)#, cache=cache)
+        qv = getvar(dset, "QVAPOR", timeidx=ALL_TIMES)#, cache=cache)
+        tmpk = getvar(dset, "tk", timeidx=ALL_TIMES)#, cache=cache)
+        pwrf = getvar(dset, "p", units='Pa', timeidx=ALL_TIMES)#, cache=cache)
+        # rho = density_dry(tv, pwrf)
+        rho = density_moist(tmpk, qv, pwrf)
+        dset.close()
+
+        # Get dz
+        dz = np.zeros(qv.shape)
+        print(dz.shape)
+        for iz in range(nz):
+            dz[iz] = hght[iz+1] - hght[iz]
+
+        # Read in variables
+
+        # rain
+        var = wrf_var_read(wrffiles[ifile], 'RAINNC')
+        # var = getvar(dset, "RAINNC", timeidx=ALL_TIMES)#, cache=cache)
+        if ifile == 0:
+            rainnc_all = var
+        else:
+            rainnc_all = np.concatenate((rainnc_all, var), axis=0)
+        # pclass
+        var = wrf_pclass(wrffiles[ifile], rho, dz)
+        if ifile == 0:
+            pclass_all = var
+        else:
+            pclass_all = np.concatenate((pclass_all, var), axis=0)
+        # pw
+        # var = wrf_pw(wrffiles[ifile], rho, dz)
+        var = vert_int(qv, rho, dz)
+        if ifile == 0:
+            pw_all = var
+        else:
+            pw_all = np.concatenate((pw_all, var), axis=0)
+        # pw_sat
+        # var = wrf_pw_sat(wrffiles[ifile], tmpk, pwrf, rho, dz)
+        var = vert_int(rv_saturation(tmpk, pwrf), rho, dz)
+        if ifile == 0:
+            pw_sat_all = var
+        else:
+            pw_sat_all = np.concatenate((pw_sat_all, var), axis=0)
+
+    nt = pclass_all.shape[0]
+
+    # Calculate rain rate as centered difference
+    rainrate = np.zeros((nt, nx1, nx2))
+    rainrate[1:-1] = (rainnc_all[2:] - rainnc_all[:-2])*0.5
+    rainrate *= npd # mm/time step --> mm/day
+
+    # Write out the variables
+    description, units, dim_set = get_metadata('pclass', nt, nz, nx1, nx2)
+    write_ncfile(outdir+'pclass.nc', pclass_all, 'pclass', description, units, dim_set)
+    description, units, dim_set = get_metadata('rain', nt, nz, nx1, nx2)
+    write_ncfile(outdir+'rainrate.nc', rainrate, 'rainrate', description, units, dim_set)
+    description, units, dim_set = get_metadata('pw', nt, nz, nx1, nx2)
+    write_ncfile(outdir+'pw.nc', pw_all, 'pw', description, units, dim_set)
+    description, units, dim_set = get_metadata('pw_sat', nt, nz, nx1, nx2)
+    write_ncfile(outdir+'pw_sat.nc', pw_sat_all, 'pw_sat', description, units, dim_set)
+
+########################################################
+########################################################

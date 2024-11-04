@@ -1,0 +1,25 @@
+#!/bin/bash
+#SBATCH -p radclouds
+#SBATCH -N 1
+#SBATCH -n 18 ##112 # max of N*56
+#SBATCH --nodelist=c969
+###SBATCH -N 1
+###SBATCH -n 56 ##112 # max of N*56
+###SBATCH -n 1 ##112 # max of N*56
+###SBATCH --nodelist=c799
+#SBATCH --exclusive
+#SBATCH --output=outbatch_out.%j.txt
+#SBATCH --error=outbatch_err.%j.txt
+#SBATCH -t 48:00:00
+
+module purge
+source ~/.bashrc
+# mamba activate plotting
+# Plotting env already loaded in .bashrc
+
+# python post_proc.py
+
+# MPI jobs
+mpirun python post_proc.py
+
+# echo 'Done!!'
