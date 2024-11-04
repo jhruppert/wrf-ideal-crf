@@ -39,5 +39,5 @@ mpiexec ./wrf.exe
 # cp rsl.out.0000 ${WRFRUNDIR}/rsl.out.${testname}
 
 # Move output files back to campaign storage
-cd ..
+# cd ..
 # mv $testname $campaign_storage

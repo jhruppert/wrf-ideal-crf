@@ -8,7 +8,7 @@
 ### Select n nodes with a max of 128 CPUs per node for a total of n*128 MPI processes
 #PBS -l select=1:ncpus=100:mpiprocs=100:ompthreads=1
 
-export testname="smalldom1"
+export testname="smalldom"
 
 export SCRTCHDIR=/glade/derecho/scratch/$USER/wrf-ideal/${testname}
 mkdir -p $SCRTCHDIR
@@ -16,6 +16,7 @@ mkdir -p $SCRTCHDIR
 export forcing_dir="../../rce_start_data"
 
 /bin/rm -f namelist.input
+/bin/rm -f input_sounding
 /bin/cp ../../bashrc_wrf_der bashrc_wrf
 /bin/cp $forcing_dir/namelist.input.${testname} ./namelist.input
 /bin/cp $forcing_dir/input_sounding.${testname} ./input_sounding
