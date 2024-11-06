@@ -12,24 +12,18 @@ from precip_class import *
 from thermo_functions import *
 
 ##########################################
+# Miscellaneous functions
+##########################################
+
+def vert_int(var, rho, dz):
+    return np.sum(var*rho*dz, axis=1)
+
+##########################################
 # Write out variable to a NetCDF file
 ##########################################
 
-def write_ncfile(file_out, dummyvar, var, var_name, description, units):#, dims_set, pres=None, do_pres=False): #, dim_names
-    # ncfile = Dataset(file_out,mode='w', clobber=True)
-    # # Add dimensions to file
-    # for idim in range(len(dims_set)):
-    #     dim = ncfile.createDimension(dims_set[0][idim], dims_set[1][idim]) # unlimited axis (can be appended to).
-    # if do_pres:
-    #     pres_nc = ncfile.createVariable('Pressure', np.single, len(pres))
-    #     pres_nc.units = 'hPa'
-    #     pres_nc[...] = pres
-    # # Write variables
-    # writevar = ncfile.createVariable(var_name, np.single, dims_set[0])
-    # writevar.units = units
-    # writevar.description = description
-    # writevar[...] = var
-    # ncfile.close()
+def write_ncfile(file_out, dummyvar, var, var_name):#, dims_set, pres=None, do_pres=False): #, dim_names
+    description, units = get_metadata(var_name)
     var = xr.DataArray(var, coords=dummyvar.coords, dims=dummyvar.dims, attrs=dummyvar.attrs, name=var_name)
     var.attrs['description'] = description
     var.attrs['units'] = units
@@ -41,9 +35,6 @@ def write_ncfile(file_out, dummyvar, var, var_name, description, units):#, dims_
 # Calculate cloud classification
 ##########################################
 
-def vert_int(var, rho, dz):
-    return np.sum(var*rho*dz, axis=1)
-
 # def wrf_pclass(infile, dp):
 def wrf_pclass(infile, rho, dz):
     # Read in and vertically integrate mixing ratios
@@ -53,41 +44,8 @@ def wrf_pclass(infile, rho, dz):
         ivar = wrf_var_read(infile,q_list[ivar]) # kg/kg
         q_var.append(ivar)
     q_var = np.stack(q_var, axis=0)
-    # g = 9.81 # m/s^2
-    # q_int = np.sum(q_var*dp, axis=1)/(-g)
-    q_int = vert_int(q_var, rho, dz)
+    q_int = np.sum(q_var*rho*dz, axis=2)
     return precip_class(q_int)
-
-##########################################
-# Calculate precipitable water (PW)
-##########################################
-
-# # def wrf_pw(infile, dp):
-# def wrf_pw(infile, rho, dz):
-#     # Read in hydrostatic pressure to get dp for integral
-#     # p_hyd = wrf_var_read(infile,'P_HYD') # Pa
-#     # p_hyd = np.ma.masked_where((p_hyd < 100e2), p_hyd, copy=False) # Mask out levels above 100 hPa
-#     # dp = np.gradient(p_hyd, axis=0, edge_order=1) # [Pa] Uses second order centered differencing
-#     # Read in and vertically integrate mixing ratios
-#     qv = wrf_var_read(infile, 'QVAPOR') # kg/kg
-#     return vert_int(qv, rho, dz)
-
-##########################################
-# Calculate saturation PW
-##########################################
-
-# # def wrf_pw_sat(infile, p_hyd, dp):
-# def wrf_pw_sat(infile, tmpk, pres, rho, dz):
-#     # T0 = 300 # K
-#     # rd=287.04 # J/K/kg
-#     # cp=1004. # J/K/kg
-#     # rocp = rd/cp
-#     # theta = wrf_var_read(infile,'T') + T0 # K
-#     # tmpk = theta*(1e5/p_hyd)**(-rocp) # K
-#     # Read in and vertically integrate mixing ratios
-#     qv_sat = rv_saturation(tmpk, pres) # kg/kg
-#     g = 9.81 # m/s^2
-#     return vert_int(qv_sat, rho, dz)
 
 ##########################################
 # Full variable lists
@@ -156,7 +114,7 @@ def var_list_2d():
 # Get variable metadata
 ##########################################
 
-def get_metadata(var_name, nt, nz, nx1, nx2):
+def get_metadata(var_name):#, nt, nz, nx1, nx2):
 
     #######################################################
     # Special 2D variables
@@ -164,23 +122,23 @@ def get_metadata(var_name, nt, nz, nx1, nx2):
     if var_name == 'pclass':
         description = 'cloud classification (0 = nocloud,1=deepc,2=congest,3=shall,4=strat,5=anvil)'
         units = '-'
-        dims = ('nt','pclass','nx1','nx2')
-        dim_set = [dims, (nt,6,nx1,nx2)]
+        # dims = ('nt','pclass','nx1','nx2')
+        # dim_set = [dims, (nt,6,nx1,nx2)]
     elif var_name == 'rainrate':
         description = 'rainrate (centered diff)'
         units = 'mm/day'
-        dims = ('nt','nx1','nx2')
-        dim_set = [dims, (nt,nx1,nx2)]
+        # dims = ('nt','nx1','nx2')
+        # dim_set = [dims, (nt,nx1,nx2)]
     elif var_name == 'pw':
         description = 'column integrated water vapor'
         units = 'mm'
-        dims = ('nt','nx1','nx2')
-        dim_set = [dims, (nt,nx1,nx2)]
+        # dims = ('nt','nx1','nx2')
+        # dim_set = [dims, (nt,nx1,nx2)]
     elif var_name == 'pw_sat':
         description = 'column integrated saturation water vapor'
         units = 'mm'
-        dims = ('nt','nx1','nx2')
-        dim_set = [dims, (nt,nx1,nx2)]
+        # dims = ('nt','nx1','nx2')
+        # dim_set = [dims, (nt,nx1,nx2)]
     #######################################################
     # Basic 3D variables
     #######################################################
@@ -270,30 +228,30 @@ def get_metadata(var_name, nt, nz, nx1, nx2):
     elif var_name == 'rthratlwcrf':
         description = 'longwave cloud-radiation forcing'
         units = 'K/s'
-        dims = ('nt','nz','nx1','nx2')
-        dim_set = [dims, (nt,nz,nx1,nx2)]
+        # dims = ('nt','nz','nx1','nx2')
+        # dim_set = [dims, (nt,nz,nx1,nx2)]
     elif var_name == 'rthratswcrf':
         description = 'shortwave cloud-radiation forcing'
         units = 'K/s'
-        dims = ('nt','nz','nx1','nx2')
-        dim_set = [dims, (nt,nz,nx1,nx2)]
+        # dims = ('nt','nz','nx1','nx2')
+        # dim_set = [dims, (nt,nz,nx1,nx2)]
     elif var_name == 'theta_e':
         description = 'equivalent potential temperature'
         units = 'K'
-        dims = ('nt','nz','nx1','nx2')
-        dim_set = [dims, (nt,nz,nx1,nx2)]
+        # dims = ('nt','nz','nx1','nx2')
+        # dim_set = [dims, (nt,nz,nx1,nx2)]
     elif var_name == 'mse':
         description = 'moist static energy'
         units = 'J/kg'
-        dims = ('nt','nz','nx1','nx2')
-        dim_set = [dims, (nt,nz,nx1,nx2)]
+        # dims = ('nt','nz','nx1','nx2')
+        # dim_set = [dims, (nt,nz,nx1,nx2)]
     # elif var_name == 'rho':
     #     description = 'density'
     #     units = 'kg/m^3'
     #     dims = ('nt','nz','nx1','nx2')
     #     dim_set = [dims, (nt,nz,nx1,nx2)]
 
-    return description, units, dim_set
+    return description, units#, dim_set
 
 ##########################################
 # 

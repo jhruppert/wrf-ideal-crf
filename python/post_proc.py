@@ -31,11 +31,11 @@ nproc = comm.Get_size()
 test_process = "ctl"
 
 # Basic 2D variables
-do_2d_vars = True
+do_2d_vars = False
 # 2D ACRE variables
-do_acre = True
+do_acre = False
 # Special 2D variables
-do_2d_special = False
+do_2d_special = True
 # Basic 3D variables
 do_3d_vars = False
 # Special 3D variables
@@ -185,44 +185,25 @@ if do_acre:
 if do_2d_special:
 
     # Read in variable from WRF files
-    # for ifile in range(nfiles):
+    for ifile in range(nfiles):
 
-    # grav = 9.81 # m/s^2
-    # hght_bs = wrf_var_read0(wrffiles[0],'PHB')/grav # m
-    # print(hght_bs.shape)
-
-    for ifile in range(3):
-
-        # Read in hydrostatic pressure to get dp for integral
-        # p_hyd = wrf_var_read(wrffiles[ifile],'P_HYD') # Pa
-        # p_hyd = np.ma.masked_where((p_hyd < 100e2), p_hyd, copy=False) # Mask out levels above 100 hPa
-        # dp = np.gradient(p_hyd, axis=0, edge_order=1) # [Pa] Uses second order centered differencing
-
-        # Use staggered height instead
-        # hght_pert = wrf_var_read(wrffiles[ifile],'PH')/grav # m
-        
         dset = Dataset(wrffiles[0])
         hght = getvar(dset, "zstag", units='m', timeidx=ALL_TIMES)#, cache=cache)
-        # Also need density
-        # tv = getvar(dset, "tv", units='K', timeidx=ALL_TIMES)#, cache=cache)
         qv = getvar(dset, "QVAPOR", timeidx=ALL_TIMES)#, cache=cache)
         tmpk = getvar(dset, "tk", timeidx=ALL_TIMES)#, cache=cache)
         pwrf = getvar(dset, "p", units='Pa', timeidx=ALL_TIMES)#, cache=cache)
-        # rho = density_dry(tv, pwrf)
         rho = density_moist(tmpk, qv, pwrf)
         dset.close()
 
         # Get dz
         dz = np.zeros(qv.shape)
-        print(dz.shape)
         for iz in range(nz):
-            dz[iz] = hght[iz+1] - hght[iz]
+            dz[:,iz] = hght[:,iz+1] - hght[:,iz]
 
         # Read in variables
 
-        # rain
+        # rainrate
         var = wrf_var_read(wrffiles[ifile], 'RAINNC')
-        # var = getvar(dset, "RAINNC", timeidx=ALL_TIMES)#, cache=cache)
         if ifile == 0:
             rainnc_all = var
         else:
@@ -234,36 +215,34 @@ if do_2d_special:
         else:
             pclass_all = np.concatenate((pclass_all, var), axis=0)
         # pw
-        # var = wrf_pw(wrffiles[ifile], rho, dz)
         var = vert_int(qv, rho, dz)
         if ifile == 0:
             pw_all = var
         else:
             pw_all = np.concatenate((pw_all, var), axis=0)
         # pw_sat
-        # var = wrf_pw_sat(wrffiles[ifile], tmpk, pwrf, rho, dz)
         var = vert_int(rv_saturation(tmpk, pwrf), rho, dz)
         if ifile == 0:
             pw_sat_all = var
         else:
             pw_sat_all = np.concatenate((pw_sat_all, var), axis=0)
 
-    nt = pclass_all.shape[0]
-
     # Calculate rain rate as centered difference
-    rainrate = np.zeros((nt, nx1, nx2))
+    nt_all = rainnc_all.shape[0]
+    rainrate = np.full((nt_all, nx1, nx2), np.nan)
+    rainrate[0] = 0
     rainrate[1:-1] = (rainnc_all[2:] - rainnc_all[:-2])*0.5
     rainrate *= npd # mm/time step --> mm/day
 
     # Write out the variables
-    description, units, dim_set = get_metadata('pclass', nt, nz, nx1, nx2)
-    write_ncfile(outdir+'pclass.nc', pclass_all, 'pclass', description, units, dim_set)
-    description, units, dim_set = get_metadata('rain', nt, nz, nx1, nx2)
-    write_ncfile(outdir+'rainrate.nc', rainrate, 'rainrate', description, units, dim_set)
-    description, units, dim_set = get_metadata('pw', nt, nz, nx1, nx2)
-    write_ncfile(outdir+'pw.nc', pw_all, 'pw', description, units, dim_set)
-    description, units, dim_set = get_metadata('pw_sat', nt, nz, nx1, nx2)
-    write_ncfile(outdir+'pw_sat.nc', pw_sat_all, 'pw_sat', description, units, dim_set)
+    name='pclass'
+    write_ncfile(outdir+name+'.nc', qv[:,0], pclass_all, name)
+    name='rainrate'
+    write_ncfile(outdir+name+'.nc', qv[:,0], rainrate, name)
+    name='pw'
+    write_ncfile(outdir+name+'.nc', qv[:,0], pw_all, name)
+    name='pw_sat'
+    write_ncfile(outdir+name+'.nc', qv[:,0], pw_sat_all, name)
 
 ########################################################
 ########################################################
