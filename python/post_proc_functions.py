@@ -5,6 +5,7 @@
 # jruppert@ou.edu
 # 1 Nov 2024
 
+import xarray as xr
 from read_wrf_ideal import *
 import numpy as np
 from precip_class import *
@@ -14,21 +15,26 @@ from thermo_functions import *
 # Write out variable to a NetCDF file
 ##########################################
 
-def write_ncfile(file_out, var, var_name, description, units, dims_set, pres=None, do_pres=False): #, dim_names
-    ncfile = Dataset(file_out,mode='w', clobber=True)
-    # Add dimensions to file
-    for idim in range(len(dims_set)):
-        dim = ncfile.createDimension(dims_set[0][idim], dims_set[1][idim]) # unlimited axis (can be appended to).
-    if do_pres:
-        pres_nc = ncfile.createVariable('Pressure', np.single, len(pres))
-        pres_nc.units = 'hPa'
-        pres_nc[...] = pres
-    # Write variables
-    writevar = ncfile.createVariable(var_name, np.single, dims_set[0])
-    writevar.units = units
-    writevar.description = description
-    writevar[...] = var
-    ncfile.close()
+def write_ncfile(file_out, dummyvar, var, var_name, description, units):#, dims_set, pres=None, do_pres=False): #, dim_names
+    # ncfile = Dataset(file_out,mode='w', clobber=True)
+    # # Add dimensions to file
+    # for idim in range(len(dims_set)):
+    #     dim = ncfile.createDimension(dims_set[0][idim], dims_set[1][idim]) # unlimited axis (can be appended to).
+    # if do_pres:
+    #     pres_nc = ncfile.createVariable('Pressure', np.single, len(pres))
+    #     pres_nc.units = 'hPa'
+    #     pres_nc[...] = pres
+    # # Write variables
+    # writevar = ncfile.createVariable(var_name, np.single, dims_set[0])
+    # writevar.units = units
+    # writevar.description = description
+    # writevar[...] = var
+    # ncfile.close()
+    var = xr.DataArray(var, coords=dummyvar.coords, dims=dummyvar.dims, attrs=dummyvar.attrs, name=var_name)
+    var.attrs['description'] = description
+    var.attrs['units'] = units
+    var.attrs['projection'] = str(dummyvar.attrs['projection'])
+    var.to_netcdf(file_out)
     return None
 
 ##########################################
@@ -160,8 +166,8 @@ def get_metadata(var_name, nt, nz, nx1, nx2):
         units = '-'
         dims = ('nt','pclass','nx1','nx2')
         dim_set = [dims, (nt,6,nx1,nx2)]
-    elif var_name == 'rain':
-        description = 'rain rate (centered diff)'
+    elif var_name == 'rainrate':
+        description = 'rainrate (centered diff)'
         units = 'mm/day'
         dims = ('nt','nx1','nx2')
         dim_set = [dims, (nt,nx1,nx2)]
