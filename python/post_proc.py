@@ -16,15 +16,10 @@
 
 from netCDF4 import Dataset
 import numpy as np
-from wrf import getvar, vinterp, ALL_TIMES#, disable_xarray
+from wrf import getvar, vinterp, ALL_TIMES
 from read_wrf_ideal import *
 from post_proc_functions import *
 import os
-from mpi4py import MPI
-
-# disable_xarray()
-comm = MPI.COMM_WORLD
-nproc = comm.Get_size()
 
 # Options
 
@@ -40,6 +35,11 @@ do_2d_special = True
 do_3d_vars = False
 # Special 3D variables
 do_3d_special = False
+
+if do_2d_vars or do_2d_special:
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+    nproc = comm.Get_size()
 
 ########################################################
 #### Directories and model output specs
@@ -186,6 +186,9 @@ if do_2d_special:
 
     # Read in variable from WRF files
     for ifile in range(nfiles):
+
+        # Open the WRF file
+        print("Reading in file "+wrffiles[ifile])
 
         dset = Dataset(wrffiles[0])
         hght = getvar(dset, "zstag", units='m', timeidx=ALL_TIMES)#, cache=cache)
