@@ -21,6 +21,11 @@ from read_wrf_ideal import *
 from post_proc_functions import *
 import os
 
+# If running do_2d_vars:
+    # need to use mpirun with 18 CPUs
+# If running do_acre:
+    # need to use mpirun with 8 CPUs
+
 # Options
 
 test_process = "ctl"
@@ -35,11 +40,6 @@ do_2d_special = True
 do_3d_vars = False
 # Special 3D variables
 do_3d_special = False
-
-if do_2d_vars or do_2d_special:
-    from mpi4py import MPI
-    comm = MPI.COMM_WORLD
-    nproc = comm.Get_size()
 
 ########################################################
 #### Directories and model output specs
@@ -81,6 +81,10 @@ def runshell(str_command):
 
 if do_2d_vars:
 
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+    nproc = comm.Get_size()
+
     # for ivar in vars2d:
     ivar = comm.rank
 
@@ -112,6 +116,10 @@ if do_2d_vars:
 ########################################################
 
 if do_acre:
+
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+    nproc = comm.Get_size()
 
     # Remove first if exists
     operation_str = 'rm -rf '+outdir+'LWacre.nc '+outdir+'SWacre.nc'
@@ -188,64 +196,71 @@ if do_2d_special:
     for ifile in range(nfiles):
 
         # Open the WRF file
-        print("Reading in file "+wrffiles[ifile])
+        file = wrffiles[ifile]
+        print("Processing "+file)
+        ds = Dataset(file)
 
-        dset = Dataset(wrffiles[0])
-        hght = getvar(dset, "zstag", units='m', timeidx=ALL_TIMES)#, cache=cache)
-        qv = getvar(dset, "QVAPOR", timeidx=ALL_TIMES)#, cache=cache)
-        tmpk = getvar(dset, "tk", timeidx=ALL_TIMES)#, cache=cache)
-        pwrf = getvar(dset, "p", units='Pa', timeidx=ALL_TIMES)#, cache=cache)
-        rho = density_moist(tmpk, qv, pwrf)
-        dset.close()
+        qv = getvar(ds, "QVAPOR", timeidx=ALL_TIMES)#, cache=cache)
+        pwrf = getvar(ds, "p", units='Pa', timeidx=ALL_TIMES)#, cache=cache)
+        # hght = getvar(dset, "zstag", units='m', timeidx=ALL_TIMES)#, cache=cache)
+        # tmpk = getvar(dset, "tk", timeidx=ALL_TIMES)#, cache=cache)
+        # rho = density_moist(tmpk, qv, pwrf)
 
         # Get dz
-        dz = np.zeros(qv.shape)
-        for iz in range(nz):
-            dz[:,iz] = hght[:,iz+1] - hght[:,iz]
+        # dz = np.zeros(qv.shape)
+        # for iz in range(nz):
+        #     dz[:,iz] = hght[:,iz+1] - hght[:,iz]
+        # Get dp
+        dp = pwrf.differentiate('bottom_top')*-1
 
         # Read in variables
 
         # rainrate
-        var = wrf_var_read(wrffiles[ifile], 'RAINNC')
+        var = getvar(ds, 'RAINNC', timeidx=ALL_TIMES)
         if ifile == 0:
             rainnc_all = var
         else:
-            rainnc_all = np.concatenate((rainnc_all, var), axis=0)
+            rainnc_all = xr.concat((rainnc_all, var), 'Time')
         # pclass
-        var = wrf_pclass(wrffiles[ifile], rho, dz)
+        var = wrf_pclass(ds, dp)
         if ifile == 0:
             pclass_all = var
         else:
-            pclass_all = np.concatenate((pclass_all, var), axis=0)
+            pclass_all = xr.concat((pclass_all, var), 'Time')
         # pw
-        var = vert_int(qv, rho, dz)
+        var = vert_int(qv, dp)
         if ifile == 0:
             pw_all = var
         else:
-            pw_all = np.concatenate((pw_all, var), axis=0)
+            pw_all = xr.concat((pw_all, var), 'Time')
         # pw_sat
-        var = vert_int(rv_saturation(tmpk, pwrf), rho, dz)
+        qvsat = get_rv_sat(ds, pwrf)
+        qvsat = xr.DataArray(qvsat, coords=qv.coords, dims=qv.dims, attrs=qv.attrs)
+        var = vert_int(qvsat, dp)
         if ifile == 0:
             pw_sat_all = var
         else:
-            pw_sat_all = np.concatenate((pw_sat_all, var), axis=0)
+            pw_sat_all = xr.concat((pw_sat_all, var), 'Time')
+
+        ds.close()
 
     # Calculate rain rate as centered difference
     nt_all = rainnc_all.shape[0]
-    rainrate = np.full((nt_all, nx1, nx2), np.nan)
+    rainrate = rainnc_all.copy()
     rainrate[0] = 0
-    rainrate[1:-1] = (rainnc_all[2:] - rainnc_all[:-2])*0.5
+    rainrate[nt_all-1] = np.nan
+    rainrate[1:-1] = (rainnc_all.values[2:] - rainnc_all.values[:-2])*0.5
     rainrate *= npd # mm/time step --> mm/day
 
     # Write out the variables
-    name='pclass'
-    write_ncfile(outdir+name+'.nc', qv[:,0], pclass_all, name)
-    name='rainrate'
-    write_ncfile(outdir+name+'.nc', qv[:,0], rainrate, name)
-    name='pw'
-    write_ncfile(outdir+name+'.nc', qv[:,0], pw_all, name)
-    name='pw_sat'
-    write_ncfile(outdir+name+'.nc', qv[:,0], pw_sat_all, name)
+    var_name='pclass'
+    write_ncfile(outdir, pclass_all, var_name)
+    var_name='rainrate'
+    write_ncfile(outdir, rainrate, var_name)
+    var_name='pw'
+    write_ncfile(outdir, pw_all, var_name)
+    var_name='pw_sat'
+    write_ncfile(outdir, pw_sat_all, var_name)
 
 ########################################################
 ########################################################

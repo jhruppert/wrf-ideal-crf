@@ -2,7 +2,7 @@
 #SBATCH -p radclouds
 #SBATCH -N 1
 ###SBATCH -n 18 ##112 # max of N*56
-#SBATCH --nodelist=c969
+###SBATCH --nodelist=c969
 ###SBATCH -N 1
 ###SBATCH -n 56 ##112 # max of N*56
 ###SBATCH -n 1 ##112 # max of N*56
