@@ -1,17 +1,17 @@
 #!/bin/bash
 #PBS -N wrfideal-large
 #PBS -A UOKL0049
-#### PBS -l walltime=12:00:00
-#PBS -l walltime=00:10:00
+#PBS -l walltime=12:00:00
+###PBS -l walltime=00:10:00
 #PBS -q main
 #PBS -j oe
 #PBS -k eod
 ### Select n nodes with a max of 128 CPUs per node for a total of n*128 MPI processes
-#PBS -l select=7:ncpus=128:mpiprocs=128:ompthreads=1
+#PBS -l select=15:ncpus=128:mpiprocs=128:ompthreads=1
 
-export testname="large1km"
+export testname="large2km"
 
-export campaign_storage="/glade/campaign/univ/uokl0049/ideal/${testname}"
+# export campaign_storage="/glade/campaign/univ/uokl0049/ideal/${testname}"
 export SCRTCHDIR=/glade/derecho/scratch/$USER/wrf-ideal/${testname}
 mkdir -p $SCRTCHDIR
 
