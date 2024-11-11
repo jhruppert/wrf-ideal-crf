@@ -7,7 +7,7 @@
 #PBS -j oe
 #PBS -k eod
 ### Select n nodes with a max of 128 CPUs per node for a total of n*128 MPI processes
-#PBS -l select=15:ncpus=128:mpiprocs=128:ompthreads=1
+#PBS -l select=10:ncpus=128:mpiprocs=128:ompthreads=1
 
 export testname="large2km"
 
