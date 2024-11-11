@@ -42,7 +42,7 @@ do_3d_vars = False
 do_3d_special = False
 
 ########################################################
-#### Directories and model output specs
+# Directories and model output specs
 ########################################################
 
 test_process = "ctl"
@@ -71,13 +71,15 @@ vars3d = var_list_3d()
 def runshell(str_command):
     # process = subprocess.Popen(str_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
     process = subprocess.Popen(str_command, shell=True, universal_newlines=True)
+    process.wait()
     # lines = process.stdout.readlines()
     # for iline in lines:
     #     print(iline)
-    process.wait()
     return None
 
-# Use CDO mergetime to generate files of basic 2D variables
+########################################################
+# Use CDO to process basic 2D variables
+########################################################
 
 if do_2d_vars:
 
@@ -111,8 +113,10 @@ if do_2d_vars:
     runshell(cdo_line_merged+out_file+str_out)
     comm.barrier()
 
+    print("Done writing out 2D basic variables")
+
 ########################################################
-# Use CDO subtraction to generate ACRE
+# Use CDO to generate ACRE
 ########################################################
 
 if do_acre:
@@ -187,7 +191,10 @@ if do_acre:
         operation_str = 'rm -rf '+outdir+'lw_net.nc '+outdir+'lw_netC.nc '+outdir+'sw_net.nc '+outdir+'sw_netC.nc'
         runshell(operation_str)
 
+    print("Done writing out ACRE variables")
+
 ########################################################
+# Process special 2D variables
 ########################################################
 
 if do_2d_special:
@@ -261,6 +268,8 @@ if do_2d_special:
     write_ncfile(outdir, pw_all, var_name)
     var_name='pw_sat'
     write_ncfile(outdir, pw_sat_all, var_name)
+
+    print("Done writing out special 2D variables")
 
 ########################################################
 ########################################################
