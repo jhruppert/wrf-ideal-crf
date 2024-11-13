@@ -16,10 +16,11 @@
 
 from netCDF4 import Dataset
 import numpy as np
-from wrf import getvar, vinterp, ALL_TIMES
+from wrf import getvar, ALL_TIMES#, vinterp
 from read_wrf_ideal import *
 from post_proc_functions import *
 import os
+import sys
 
 # If running do_2d_vars:
     # need to use mpirun with 18 CPUs
@@ -31,11 +32,11 @@ import os
 test_process = "ctl"
 
 # Basic 2D variables
-do_2d_vars = False
+do_2d_vars = True
 # 2D ACRE variables
 do_acre = False
 # Special 2D variables
-do_2d_special = True
+do_2d_special = False
 # Basic 3D variables
 do_3d_vars = False
 # Special 3D variables
@@ -45,16 +46,18 @@ do_3d_special = False
 # Directories and model output specs
 ########################################################
 
-test_process = "ctl"
+# test_process = "ctl"
+test_process = "large2km"
 
 # wrfdir = "/glade/campaign/univ/uokl0049/ideal/largedom2/"+test_process+"/"
-wrfdir = "/ourdisk/hpc/radclouds/auto_archive_notyet/tape_2copies/wrf-ideal/largedom2/"+test_process+"/"
+# wrfdir = "/ourdisk/hpc/radclouds/auto_archive_notyet/tape_2copies/wrf-ideal/largedom2/"+test_process+"/"
+wrfdir = "/glade/derecho/scratch/ruppert/wrf-ideal/"+test_process+"/"
 outdir = wrfdir+"post_proc/"
 os.makedirs(outdir, exist_ok=True)
 
 # # Get WRF file list, dimensions
-wrftag = "wrfout_d01"
-wrffiles = get_wrf_file_list(wrfdir, wrftag)
+wrffiles = get_wrf_file_list(wrfdir, "wrfout_d01")
+hffiles = get_wrf_file_list(wrfdir, "hfout_d01")
 lat, lon, nx1, nx2, nz, npd = wrf_dims(wrffiles[0])
 nfiles = len(wrffiles)
 
@@ -65,7 +68,7 @@ nznew = len(pres)
 
 # Get variable lists
 vars2d = var_list_2d()
-vars3d = var_list_3d()
+# vars3d = var_list_3d()
 
 # CDO command
 def runshell(str_command):
@@ -104,13 +107,15 @@ if do_2d_vars:
     # Create string array of file-specific commands
     cdo_line = [operation_str1]
     # for ifile in wrffiles:
-    for ifile in wrffiles:
+    # for ifile in hffiles:
+    for ifile in hffiles[:-1]:
         cdo_line.append(operation_str2+ifile)
     # Then join them into one string
     cdo_line_merged = " ".join(cdo_line)
 
     # Run CDO command
     runshell(cdo_line_merged+out_file+str_out)
+    print("Done processing "+varname_str)
     comm.barrier()
 
     print("Done writing out 2D basic variables")
